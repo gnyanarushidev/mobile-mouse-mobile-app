@@ -20,20 +20,20 @@ Turn your Android phone into a precise wireless touchpad and remote mouse for yo
 
 ## 🧱 Architecture Overview
 
-```mermaid
-flowchart LR
-    Phone[Flutter App]
-    subgraph Flutter Layers
-        UI[Touchpad & Controls]
-        Controller[MouseController]
-        TCP[TcpService]
-    end
-    Laptop[Desktop Listener]
+ ```mermaid
+ flowchart LR
+     Phone[Flutter App]
+     subgraph Flutter Layers
+         UI[Touchpad & Controls]
+         Controller[MouseController]
+         TCP[TcpService]
+     end
+     Laptop[Desktop Listener]
 
-    UI --> Controller --> TCP -->|JSON {gyroX, gyroY, leftClick}| Laptop
-    UI -->|Clicks| Controller
-    Gyro[Gyroscope Stream] --> Controller
-```
+     UI --> Controller --> TCP -.-> "JSON: gyroX, gyroY, leftClick" --> Laptop
+     UI --> "Clicks" --> Controller
+     Gyro[Gyroscope Stream] --> Controller
+ ```
 
 - `MouseController` marshals touch or gyro data into JSON payloads (`gyroX`, `gyroY`, `leftClick`, `rightClick`).
 - `TcpService` keeps a persistent socket connection to the desktop listener and logs every outbound payload.
@@ -48,20 +48,66 @@ flowchart LR
 - Flutter 3.9+ (Dart 3.9 SDK)
 - Android Studio or VS Code with Flutter extension
 - Physical Android device or emulator with motion sensors (gyro mode needs a real device)
-- Desktop listener (Java/Python/etc.) running on the same Wi-Fi network and listening on TCP port 5000 by default
+- Desktop listener running on the same Wi-Fi network and listening on TCP port 5000 by default
+
+#### Desktop Listener — Install
+
+The desktop listener is a Java application that receives touch/mouse input from the phone and controls the cursor on your laptop.
+
+<details>
+<summary><b>macOS (Homebrew)</b></summary>
+
+```bash
+brew tap gnyanarushi/mobile-mouse-desktop-app
+brew install mobile-mouse-desktop-app
+
+# Start the listener (default port 5000)
+mobile-mouse-desktop
+
+# Or specify a custom host and port
+mobile-mouse-desktop --host 0.0.0.0 --port 5000
+```
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+```powershell
+# Run the installer in PowerShell (admin recommended)
+curl -fsSL https://raw.githubusercontent.com/gnyanarushi/homebrew-mobile-mouse-desktop-app/main/install.ps1 | Invoke-Expression
+
+# Or install via the .msi/.exe from the releases page
+# https://github.com/gnyanarushi/mobile-mouse-desktop-app/releases
+```
+</details>
+
+<details>
+<summary><b>Linux / Manual (JAR)</b></summary>
+
+```bash
+# Download the latest release and run
+java -jar mobile-mouse-desktop-app.jar
+
+# Or build from source
+git clone https://github.com/gnyanarushi/mobile-mouse-desktop-app.git
+cd mobile-mouse-desktop-app
+./gradlew build
+java -jar build/libs/mobile-mouse-desktop-app.jar
+```
+</details>
 
 ### Installation
 
 ```bash
 # Clone the repo
- git clone https://github.com/gnyanarushi/mobile-mouse-mobile-app.git
- cd mobile-mouse-mobile-app
+git clone https://github.com/gnyanarushi/mobile-mouse-mobile-app.git
+cd mobile-mouse-mobile-app
 
 # Fetch dependencies
- flutter pub get
+flutter pub get
 
 # Run on an Android device
- flutter run
+flutter run
 ```
 
 ---
@@ -81,7 +127,19 @@ flowchart LR
 
 ---
 
-## 🖥️ Desktop Listener Expectations
+## 🖥️ Desktop Listener
+
+### Install
+
+| Platform | Command |
+|----------|---------|
+| **macOS** | `brew tap gnyanarushi/mobile-mouse-desktop-app && brew install mobile-mouse-desktop-app` |
+| **Windows** | `curl -fsSL https://raw.githubusercontent.com/gnyanarushi/homebrew-mobile-mouse-desktop-app/main/install.ps1 | Invoke-Expression` |
+| **Linux / Manual** | `java -jar mobile-mouse-desktop-app.jar` |
+
+> 📦 Full source: [github.com/gnyanarushi/mobile-mouse-desktop-app](https://github.com/gnyanarushi/mobile-mouse-desktop-app)
+
+### Connection
 
 - Listens on TCP `host:port` (default `0.0.0.0:5000`).
 - Parses newline-delimited JSON with this schema:

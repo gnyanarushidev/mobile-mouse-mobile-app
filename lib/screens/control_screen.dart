@@ -154,24 +154,70 @@ class _ControlScreenState extends State<ControlScreen>
     });
   }
 
+  /// Waits for the desktop's response to a WebSocket start request. The
+  /// desktop reports back the port it actually bound (it falls back to
+  /// another port if the requested one was unavailable, e.g. taken by
+  /// another app), so the client connects to whatever port comes back here
+  /// rather than assuming [requestedPort] worked. Falls back to
+  /// [requestedPort] if no response arrives in time, so older desktop
+  /// builds that don't send a response still work as before.
+  Future<int?> _awaitWebSocketStartPort(int requestedPort) async {
+    final completer = Completer<int?>();
+    late final StreamSubscription<Map<String, dynamic>> sub;
+    sub = widget.tcpService.messageStream.listen((message) {
+      final ws = message['websocket'];
+      if (ws is! Map) return;
+      switch (ws['status']) {
+        case 'started':
+          final port = ws['port'];
+          if (port is int && !completer.isCompleted) {
+            completer.complete(port);
+          }
+          break;
+        case 'error':
+          if (!completer.isCompleted) completer.complete(null);
+          break;
+      }
+    });
+
+    final result = await completer.future.timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => requestedPort,
+    );
+    await sub.cancel();
+    return result;
+  }
+
   Future<void> _startStreaming() async {
     if (_isStreaming) return;
 
     if (_useWebSocket) {
       // Use WebSocket streaming
-      final wsPort = 8080; // Default WebSocket port
+      final requestedPort = 8080; // Preferred port; desktop may fall back to another
       final desktopIp = widget.connection.host;
 
       // Request server to start WebSocket streaming
       mouseController.startWebSocketStream(
-        port: wsPort,
+        port: requestedPort,
         fps: 12,
         maxWidth: 1280,
         quality: 0.7,
       );
 
-      // Give server a moment to start the WebSocket server
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Wait for the desktop to report which port it actually bound to -- it
+      // falls back to another port if the requested one is already in use,
+      // so the client must not assume the requested port was honored.
+      final wsPort = await _awaitWebSocketStartPort(requestedPort);
+      if (wsPort == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to start WebSocket stream on desktop'),
+            ),
+          );
+        }
+        return;
+      }
 
       // Connect to WebSocket
       final wsUrl = 'ws://$desktopIp:$wsPort';
@@ -372,15 +418,25 @@ class _ControlScreenState extends State<ControlScreen>
       );
     }
 
-    // Normal view with controls
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.connection.nickname),
-        backgroundColor: colorScheme.primary,
-        foregroundColor: Colors.white,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                colorScheme.primary,
+                Color.lerp(colorScheme.primary, const Color(0xFF312E81), 0.35)!,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout_rounded),
+            tooltip: 'Disconnect',
             onPressed: () {
               ConnectionManager().clearActiveConnection();
               Navigator.of(context).pushAndRemoveUntil(
@@ -395,74 +451,51 @@ class _ControlScreenState extends State<ControlScreen>
       ),
       body: Column(
         children: [
-          // Top 40%: Screen Streaming
           Expanded(flex: 40, child: _buildStreamingSection(colorScheme)),
-
-          // Bottom 60%: Mouse and Keyboard with tap navigation
           Expanded(
             flex: 60,
             child: Column(
               children: [
-                // Navigation buttons
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _showMouseTab
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _showMouseTab = true;
-                                  });
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _showMouseTab
-                                ? colorScheme.primary
-                                : Colors.grey[300],
-                            foregroundColor: _showMouseTab
-                                ? Colors.white
-                                : Colors.grey[600],
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text('Mouse'),
+                Material(
+                  color: colorScheme.surface,
+                  elevation: 1,
+                  shadowColor: Colors.black26,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment<bool>(
+                          value: true,
+                          label: Text('Mouse'),
+                          icon: Icon(Icons.mouse_rounded, size: 18),
+                        ),
+                        ButtonSegment<bool>(
+                          value: false,
+                          label: Text('Keyboard'),
+                          icon: Icon(Icons.keyboard_rounded, size: 18),
+                        ),
+                      ],
+                      selected: {_showMouseTab},
+                      onSelectionChanged: (Set<bool> next) {
+                        setState(() => _showMouseTab = next.first);
+                      },
+                      showSelectedIcon: false,
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        padding: WidgetStateProperty.all(
+                          const EdgeInsets.symmetric(vertical: 12),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: !_showMouseTab
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _showMouseTab = false;
-                                  });
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: !_showMouseTab
-                                ? colorScheme.primary
-                                : Colors.grey[300],
-                            foregroundColor: !_showMouseTab
-                                ? Colors.white
-                                : Colors.grey[600],
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text('Keyboard'),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                // Content area
                 Expanded(
-                  child: _showMouseTab
-                      ? _buildMouseTab(colorScheme)
-                      : _buildKeyboardTab(colorScheme),
+                  child: ColoredBox(
+                    color: colorScheme.surfaceContainerLowest,
+                    child: _showMouseTab
+                        ? _buildMouseTab(colorScheme)
+                        : _buildKeyboardTab(colorScheme),
+                  ),
                 ),
               ],
             ),
@@ -477,18 +510,27 @@ class _ControlScreenState extends State<ControlScreen>
       color: Colors.black,
       child: Column(
         children: [
-          // Stream controls
           Container(
-            color: colorScheme.primary.withOpacity(0.1),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh.withOpacity(0.95),
+              border: Border(
+                bottom: BorderSide(
+                  color: colorScheme.outlineVariant.withOpacity(0.5),
+                ),
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     _isStreaming
-                        ? 'Streaming via ${_useWebSocket ? 'WebSocket' : 'UDP'}'
-                        : 'Stream not active',
-                    style: const TextStyle(fontSize: 12),
+                        ? 'Live · ${_useWebSocket ? 'WebSocket' : 'UDP'}'
+                        : 'Stream idle',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
                   ),
                 ),
                 // Fullscreen button
@@ -577,14 +619,17 @@ class _ControlScreenState extends State<ControlScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SwitchListTile.adaptive(
-            value: _gyroModeEnabled,
-            onChanged: _toggleGyroMode,
-            title: const Text('Gyroscope Control'),
-            subtitle: const Text('Use phone motion as mouse input'),
-            tileColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          Card(
+            margin: EdgeInsets.zero,
+            child: SwitchListTile.adaptive(
+              value: _gyroModeEnabled,
+              onChanged: _toggleGyroMode,
+              title: const Text('Gyroscope control'),
+              subtitle: const Text('Use device motion as pointer input'),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 4,
+              ),
             ),
           ),
           const SizedBox(height: 16),

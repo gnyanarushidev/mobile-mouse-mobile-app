@@ -147,90 +147,260 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     }
   }
 
+  Future<void> _showEditDialog(ConnectionInfo connection) async {
+    final hostCtrl = TextEditingController(text: connection.host);
+    final tcpPortCtrl = TextEditingController(text: connection.tcpPort.toString());
+    final udpPortCtrl = TextEditingController(text: connection.udpPort.toString());
+    final nicknameCtrl = TextEditingController(text: connection.nickname);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Connection'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: nicknameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'System Name',
+                  prefixIcon: Icon(Icons.label),
+                  hintText: 'My Desktop',
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: hostCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Desktop IP',
+                  prefixIcon: Icon(Icons.computer),
+                  hintText: '192.168.1.100',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: tcpPortCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'TCP Port',
+                        prefixIcon: Icon(Icons.settings_input_hdmi),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: udpPortCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'UDP Port',
+                        prefixIcon: Icon(Icons.router),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final host = hostCtrl.text.trim();
+              final tcpPort = int.tryParse(tcpPortCtrl.text.trim()) ?? 5000;
+              final udpPort = int.tryParse(udpPortCtrl.text.trim()) ?? 6000;
+              final nickname = nicknameCtrl.text.trim().isEmpty
+                  ? host
+                  : nicknameCtrl.text.trim();
+
+              if (host.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(content: Text('Please enter a host IP address')),
+                );
+                return;
+              }
+
+              final updated = connection.copyWith(
+                host: host,
+                tcpPort: tcpPort,
+                udpPort: udpPort,
+                nickname: nickname,
+              );
+
+              _storage.updateConnection(connection, updated).then((_) {
+                _loadConnections();
+                if (mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('${updated.nickname} updated')),
+                  );
+                }
+                Navigator.of(ctx).pop();
+              });
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    hostCtrl.dispose();
+    tcpPortCtrl.dispose();
+    udpPortCtrl.dispose();
+    nicknameCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final onGradient = Colors.white.withOpacity(0.88);
 
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1D4ED8)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF020617),
+              Color(0xFF1E1B4B),
+              Color(0xFF4338CA),
+            ],
+            stops: [0.0, 0.42, 1.0],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Header
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                 child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: Image.asset(
-                        'assets/icon/icon.png',
-                        height: 80,
-                        width: 80,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Mobile Mouse',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Connect to your desktop',
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withOpacity(0.2),
+                                Colors.white.withOpacity(0.06),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.28),
+                            ),
+                          ),
+                          child: Image.asset(
+                            'assets/icon/icon.png',
+                            height: 52,
+                            width: 52,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Mobile Mouse',
+                                style: TextStyle(
+                                  color: onGradient,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.6,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Connect to your desktop on the same Wi‑Fi',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.72),
+                                  fontSize: 14,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
 
-              // Content
               Expanded(
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF8FAFF),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      topRight: Radius.circular(32),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(28),
+                      topRight: Radius.circular(28),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
                   ),
                   child: _isConnecting
-                      ? const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CircularProgressIndicator(),
-                              SizedBox(height: 16),
-                              Text(
-                                'Connecting...',
-                                style: TextStyle(fontSize: 16),
-                              ),
-                            ],
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 52,
+                                  height: 52,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'Connecting…',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Checking TCP reachability',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // New Connection Button
-                              ElevatedButton.icon(
+                              FilledButton.icon(
                                 onPressed: () {
                                   setState(() {
                                     _showNewConnectionForm =
@@ -239,43 +409,62 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                                 },
                                 icon: Icon(
                                   _showNewConnectionForm
-                                      ? Icons.close
-                                      : Icons.add,
+                                      ? Icons.close_rounded
+                                      : Icons.add_rounded,
                                 ),
                                 label: Text(
                                   _showNewConnectionForm
-                                      ? 'Cancel'
-                                      : 'New Connection',
+                                      ? 'Close form'
+                                      : 'New connection',
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.all(16),
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                 ),
                               ),
 
-                              // New Connection Form
                               if (_showNewConnectionForm) ...[
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 20),
                                 Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
                                   child: Padding(
-                                    padding: const EdgeInsets.all(16),
+                                    padding: const EdgeInsets.all(20),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.link_rounded,
+                                              color: colorScheme.primary,
+                                              size: 22,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Text(
+                                              'Add desktop',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: -0.3,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
                                         Text(
-                                          'New Connection',
+                                          'Use your computer’s LAN IP (often 192.168.x.x).',
                                           style: Theme.of(context)
                                               .textTheme
-                                              .titleLarge
+                                              .bodySmall
                                               ?.copyWith(
-                                                fontWeight: FontWeight.bold,
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
                                               ),
                                         ),
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: 20),
                                         TextField(
                                           controller: _nicknameController,
                                           decoration: const InputDecoration(
@@ -329,8 +518,8 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton(
+                                        const SizedBox(height: 20),
+                                        FilledButton(
                                           onPressed: _connectWithNewConnection,
                                           child: const Text('Connect'),
                                         ),
@@ -340,117 +529,211 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                                 ),
                               ],
 
-                              // Saved Connections
                               if (_savedConnections.isNotEmpty) ...[
-                                const SizedBox(height: 24),
-                                Text(
-                                  'Recent Connections',
-                                  style: Theme.of(context).textTheme.titleMedium
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
+                                const SizedBox(height: 28),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Recent',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: -0.2,
+                                          ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
                                       ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.primaryContainer
+                                            .withOpacity(0.65),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        '${_savedConnections.length}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 14),
                                 ..._savedConnections.map((connection) {
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
-                                    child: Card(
-                                      elevation: 2,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
+                                    child: Material(
+                                      color: Colors.transparent,
                                       child: InkWell(
                                         onTap: () =>
                                             _connectToDesktop(connection),
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(
-                                                  12,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: colorScheme.primary
-                                                      .withOpacity(0.1),
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                                child: Icon(
-                                                  Icons.computer,
-                                                  color: colorScheme.primary,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 16),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      connection.nickname,
-                                                      style: const TextStyle(
-                                                        fontSize: 16,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      '${connection.host}:${connection.tcpPort}',
-                                                      style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors
-                                                            .grey
-                                                            .shade600,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.delete_outline,
-                                                ),
-                                                color: Colors.red.shade400,
-                                                onPressed: () =>
-                                                    _deleteConnection(
-                                                      connection,
-                                                    ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Ink(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                            border: Border.all(
+                                              color: colorScheme.outlineVariant
+                                                  .withOpacity(0.6),
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.04),
+                                                blurRadius: 12,
+                                                offset: const Offset(0, 4),
                                               ),
                                             ],
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                              vertical: 14,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 24,
+                                                  backgroundColor: colorScheme
+                                                      .primaryContainer
+                                                      .withOpacity(0.85),
+                                                  child: Icon(
+                                                    Icons.desktop_mac_rounded,
+                                                    color: colorScheme.primary,
+                                                    size: 24,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 14),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        connection.nickname,
+                                                        style: const TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 6),
+                                                      Wrap(
+                                                        spacing: 8,
+                                                        runSpacing: 6,
+                                                        children: [
+                                                          _PortChip(
+                                                            label:
+                                                                'TCP ${connection.tcpPort}',
+                                                            icon: Icons
+                                                                .settings_input_hdmi,
+                                                            colorScheme:
+                                                                colorScheme,
+                                                          ),
+                                                          _PortChip(
+                                                            label:
+                                                                'UDP ${connection.udpPort}',
+                                                            icon: Icons
+                                                                .sensors_rounded,
+                                                            colorScheme:
+                                                                colorScheme,
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        connection.host,
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: colorScheme
+                                                                  .onSurfaceVariant,
+                                                              fontFeatures: const [
+                                                                FontFeature
+                                                                    .tabularFigures(),
+                                                              ],
+                                                            ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                 IconButton(
+                                                   icon: Icon(
+                                                     Icons.edit_rounded,
+                                                     color: colorScheme.primary.withOpacity(0.85),
+                                                   ),
+                                                   onPressed: () => _showEditDialog(connection),
+                                                 ),
+                                                 IconButton(
+                                                   icon: Icon(
+                                                     Icons.delete_outline_rounded,
+                                                     color: colorScheme.error.withOpacity(0.85),
+                                                   ),
+                                                   onPressed: () => _deleteConnection(connection),
+                                                  ),
+                                               ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   );
-                                }).toList(),
+                                }),
                               ] else if (!_showNewConnectionForm) ...[
-                                const SizedBox(height: 48),
+                                const SizedBox(height: 40),
                                 Center(
                                   child: Column(
                                     children: [
-                                      Icon(
-                                        Icons.history,
-                                        size: 64,
-                                        color: Colors.grey.shade400,
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'No saved connections',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey.shade600,
+                                      Container(
+                                        padding: const EdgeInsets.all(22),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: colorScheme
+                                              .surfaceContainerHighest
+                                              .withOpacity(0.6),
+                                        ),
+                                        child: Icon(
+                                          Icons.devices_rounded,
+                                          size: 48,
+                                          color: colorScheme.onSurfaceVariant,
                                         ),
                                       ),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: 20),
                                       Text(
-                                        'Tap "New Connection" to get started',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey.shade500,
+                                        'No saved desktops yet',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 24,
+                                        ),
+                                        child: Text(
+                                          'Add a connection with your computer’s IP and default ports (TCP 5000, UDP 6000).',
+                                          textAlign: TextAlign.center,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
+                                                height: 1.4,
+                                              ),
                                         ),
                                       ),
                                     ],
@@ -465,6 +748,43 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PortChip extends StatelessWidget {
+  const _PortChip({
+    required this.label,
+    required this.icon,
+    required this.colorScheme,
+  });
+
+  final String label;
+  final IconData icon;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withOpacity(0.65),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+          ),
+        ],
       ),
     );
   }

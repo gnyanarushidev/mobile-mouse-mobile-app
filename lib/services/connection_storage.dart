@@ -85,6 +85,41 @@ class ConnectionStorage {
     }
   }
 
+  /// Update an existing connection identified by oldHost/oldTcpPort/oldUdpPort
+  Future<void> updateConnection(ConnectionInfo oldConnection, ConnectionInfo newConnection) async {
+    try {
+      final connections = await getConnections();
+
+      final index = connections.indexWhere((c) =>
+          c.host == oldConnection.host &&
+          c.tcpPort == oldConnection.tcpPort &&
+          c.udpPort == oldConnection.udpPort);
+
+      if (index != -1) {
+        connections[index] = newConnection;
+      }
+
+      // Remove any other duplicates with the new ports
+      connections.removeWhere((c) =>
+          c.host == newConnection.host &&
+          c.tcpPort == newConnection.tcpPort &&
+          c.udpPort == newConnection.udpPort &&
+          c != newConnection);
+
+      if (connections.length > _maxConnections) {
+        connections.removeRange(_maxConnections, connections.length);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = jsonEncode(connections.map((c) => c.toJson()).toList());
+      await prefs.setString(_connectionsKey, jsonString);
+
+      dev.log('Connection updated: ${newConnection.nickname}');
+    } catch (e) {
+      dev.log('Error updating connection: $e');
+    }
+  }
+
   /// Clear all saved connections
   Future<void> clearAll() async {
     try {
